@@ -139,15 +139,10 @@ def main():
     target_fps = 20
 
     print(f"\nPerforming YOLO detection ", end="")
-    found = False
-    provider = ""
-    for provider in providers:
-        if provider in ort_session.get_providers():
-            found = True
-            break
-
-    if found:
-        print(f"using GPU via {provider}")
+    provider = [p for p in providers if p in ort_session.get_providers()]
+    
+    if provider:
+        print(f"using GPU via {provider[0]}")
     else:
         print("using CPU")
     print(f"YOLO model: {yolo_model}\nTarget fps: {target_fps}")

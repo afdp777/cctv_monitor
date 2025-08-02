@@ -91,6 +91,3 @@ You can check which provider is active in the console output.
 MIT License
 
 ---
-
-**Author:** Anthony Dela Paz
-**Repository:** https://github.com/afdp777/cctv_monitor
