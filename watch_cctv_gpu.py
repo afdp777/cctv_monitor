@@ -3,6 +3,9 @@ import numpy as np
 from ultralytics import YOLO
 import cv2
 import os, time
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning, module="onnxruntime")
 
 # URL of the MJPEG stream
 stream_url = "rtsp://192.168.1.23:554/live/ch01_1"
@@ -15,6 +18,13 @@ cap = cv2.VideoCapture(stream_url)
 yolo_model = "yolo11n.pt"
 onnx_model = f"{yolo_model.split('.')[0]}.onnx"
 COCO_CLASSES = []
+
+# Run the inference on GPU
+providers = ['CUDAExecutionProvider', 'OpenVINOExecutionProvider', 'DmlExecutionProvider']
+ort_session = ort.InferenceSession(onnx_model, providers=providers)
+
+# Get the input name from the ONNX model
+input_name = ort_session.get_inputs()[0].name
 
 
 def extract_coco_classes_from_ultralytics_yolo(model):
@@ -43,8 +53,14 @@ def preprocess_image(img, img_size=640):
     return img #, orig
 
 
+# Perform YOLO detection
+def process_image(input_img):
+    global ort_session, input_name
+    return (ort_session.run(None, {input_name: input_img}))
+
+
 # Postprocessing: extract detections, draw boxes
-def postprocess(outputs, img, conf_thres=0.4):
+def postprocess_image(outputs, img, conf_thres=0.4):
     global COCO_CLASSES
     predictions = np.transpose(np.squeeze(outputs[0]))
     boxes = []
@@ -90,16 +106,9 @@ def postprocess(outputs, img, conf_thres=0.4):
 
 
 def main():
+    global ort_session, input_name
     # download the ultralytics yolo model
     export_yolo_to_onnx()
-
-    # Run the inference on GPU
-    providers = ['CUDAExecutionProvider', 'OpenVINOExecutionProvider', 'DmlExecutionProvider']
-    ort_session = ort.InferenceSession(onnx_model, providers=providers)
-    ort_session.disable_fallback()
-
-    # Get the input name from the ONNX model
-    input_name = ort_session.get_inputs()[0].name
     
     frame_count = 0
     start_time = time.time()
@@ -134,9 +143,10 @@ def main():
         # resize, normalize, convert to CHW
         input_img = preprocess_image(frame)        
         # Run YOLO detection on the input image
-        results = ort_session.run(None, {input_name: input_img})
+        results = process_image(input_img)
+        #results = ort_session.run(None, {input_name: input_img})
         # extract detections, draw boxes
-        result_img = postprocess(results, frame, 0.4)
+        result_img = postprocess_image(results, frame, 0.4)
         # Show the frame rate
         frame_count += 1
         elapsed = time.time() - start_time
