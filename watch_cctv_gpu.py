@@ -31,7 +31,7 @@ import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="onnxruntime")
 
 # URL of the MJPEG stream
-stream_url = "rtsp://192.168.1.23:554/live/ch00_0"
+stream_url = "rtsp://192.168.1.23:554/live/ch01_1"
 
 # Create a VideoCapture object to read from the MJPEG stream
 cap = cv2.VideoCapture(stream_url)
