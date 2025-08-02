@@ -42,12 +42,8 @@ yolo_model = "yolo11n.pt"
 onnx_model = f"{yolo_model.split('.')[0]}.onnx"
 COCO_CLASSES = []
 
-# Run the inference on GPU
-providers = ['CUDAExecutionProvider', 'OpenVINOExecutionProvider', 'DmlExecutionProvider']
-ort_session = ort.InferenceSession(onnx_model, providers=providers)
-
-# Get the input name from the ONNX model
-input_name = ort_session.get_inputs()[0].name
+ort_session = None
+input_name = None
 
 
 def extract_coco_classes_from_ultralytics_yolo(model):
@@ -136,11 +132,17 @@ def main():
     frame_count = 0
     start_time = time.time()
     fps = 0
-    target_fps = 20
+    target_fps = 15
+
+    # Run the inference on GPU
+    providers = ['CUDAExecutionProvider', 'OpenVINOExecutionProvider', 'DmlExecutionProvider']
+    ort_session = ort.InferenceSession(onnx_model, providers=providers)
+    # Get the input name from the ONNX model
+    input_name = ort_session.get_inputs()[0].name
+    # Get available provider
+    provider = [p for p in providers if p in ort_session.get_providers()]
 
     print(f"\nPerforming YOLO detection ", end="")
-    provider = [p for p in providers if p in ort_session.get_providers()]
-    
     if provider:
         print(f"using GPU via {provider[0]}")
     else:
@@ -151,7 +153,6 @@ def main():
         # Skip frames to catch up
         skip_count = max(0, fps - target_fps)
         for _ in range(skip_count):
-            print("skipped frames")
             cap.read()
 
         ret, frame = cap.read()

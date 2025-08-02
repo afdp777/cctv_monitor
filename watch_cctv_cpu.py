@@ -23,7 +23,6 @@ def main():
         # Skip frames to catch up
         skip_count = max(0, fps - target_fps)
         for _ in range(skip_count):
-            print("skipped frames")
             cap.read()
 
         ret, frame = cap.read()
