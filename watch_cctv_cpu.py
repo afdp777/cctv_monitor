@@ -36,7 +36,7 @@ def main():
         # Draw only 'person' detections
         for box in results[0].boxes:
             class_id = int(box.cls[0])
-            if True: # results[0].names[class_id] == 'person':
+            if results[0].names[class_id] == 'person':
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 cv2.putText(frame, f"{results[0].names[class_id]}: {box.conf[0]:.2f}", (x1, y1 - 10),

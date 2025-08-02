@@ -31,7 +31,7 @@ import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="onnxruntime")
 
 # URL of the MJPEG stream
-stream_url = "rtsp://192.168.1.23:554/live/ch01_1"
+stream_url = "rtsp://192.168.1.23:554/live/ch00_0"
 
 # Create a VideoCapture object to read from the MJPEG stream
 cap = cv2.VideoCapture(stream_url)
@@ -121,7 +121,7 @@ def postprocess_image(outputs, img, conf_thres=0.4):
         conf = confidences[i]
         class_id = class_ids[i]
         # person of interest
-        if True: # class_id == 0: # "person"
+        if class_id == 0: # "person"
             label = f"{COCO_CLASSES[class_id]}: {conf:.2f}"
             cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
             cv2.putText(img, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 250, 250), 2)
@@ -169,7 +169,7 @@ def main():
         results = process_image(input_img)
         #results = ort_session.run(None, {input_name: input_img})
         # extract detections, draw boxes
-        result_img = postprocess_image(results, frame, 0.4)
+        result_img = postprocess_image(results, frame, 0.3)
         # Show the frame rate
         frame_count += 1
         elapsed = time.time() - start_time

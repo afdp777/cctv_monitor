@@ -1,6 +1,13 @@
 # CCTV Monitor with YOLO and ONNX Runtime
 
-This project provides a Python script to monitor a CCTV RTSP stream using a YOLO object detection model accelerated with ONNX Runtime. It supports GPU acceleration on NVIDIA, Intel, and AMD hardware.
+This project provides a Python script to monitor a CCTV RTSP stream using a YOLO object detection model accelerated with ONNX Runtime. It supports GPU acceleration on NVIDIA, Intel, and AMD hardware.<br><br>
+The CCTV stream is from V380 Pro IP camera, like this: 
+<br><br>
+![V380 Pro IP Camera](cctv_ip_camera.jpg)
+<br><br> Sample detection: <br><br>
+![V380 Pro IP Camera](person_detected.jpg)
+<br><br> CPU and GPU Load: <br><br>
+![V380 Pro IP Camera](cpu_and_gpu_load.jpg)
 
 ## Features
 
