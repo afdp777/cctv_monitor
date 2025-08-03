@@ -12,6 +12,19 @@ stream_url = "rtsp://192.168.1.23:554/live/ch00_0"
 cap = cv2.VideoCapture(stream_url)
 
 
+def resize_with_aspect_ratio(image, width=None, height=None, inter=cv2.INTER_AREA):
+    (h, w) = image.shape[:2]
+    if width is None and height is None:
+        return image
+    if width is None:
+        r = height / float(h)
+        dim = (int(w * r), height)
+    else:
+        r = width / float(w)
+        dim = (width, int(h * r))
+    return cv2.resize(image, dim, interpolation=inter)
+
+
 def main():
     
     frame_count = 0
@@ -35,18 +48,19 @@ def main():
         # Draw only 'person' detections
         for box in results[0].boxes:
             class_id = int(box.cls[0])
-            if results[0].names[class_id] == 'person':
+            if results[0].names[class_id] in ['person', 'dog', 'cat']:
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 cv2.putText(frame, f"{results[0].names[class_id]}: {box.conf[0]:.2f}", (x1, y1 - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        # make it viewable onscreen
+        frame = resize_with_aspect_ratio(frame, width=720)
         # Show the frame rate
         frame_count += 1
         elapsed = time.time() - start_time
         if elapsed > 0:
             fps = int(frame_count / elapsed)
-            cv2.putText(frame, f"{fps}fps", (5, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 250, 250), 1)
+            cv2.putText(frame, f"{fps}fps", (5, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 250, 250), 1)
         # Show the frame
         cv2.imshow('YOLO on MJPEG Stream using CPU', frame)
 

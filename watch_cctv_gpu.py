@@ -117,22 +117,30 @@ def postprocess_image(outputs, img, conf_thres=0.4):
         conf = confidences[i]
         class_id = class_ids[i]
         # person of interest
-        if class_id == 0: # "person"
+        if COCO_CLASSES[class_id] in ['person', 'dog', 'cat']: # class_id == 0: # "person"
             label = f"{COCO_CLASSES[class_id]}: {conf:.2f}"
             cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
             cv2.putText(img, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 250, 250), 2)
     return img
 
 
+def resize_with_aspect_ratio(image, width=None, height=None, inter=cv2.INTER_AREA):
+    (h, w) = image.shape[:2]
+    if width is None and height is None:
+        return image
+    if width is None:
+        r = height / float(h)
+        dim = (int(w * r), height)
+    else:
+        r = width / float(w)
+        dim = (width, int(h * r))
+    return cv2.resize(image, dim, interpolation=inter)
+
+
 def main():
     global ort_session, input_name
     # download the ultralytics yolo model
     export_yolo_to_onnx()
-    
-    frame_count = 0
-    start_time = time.time()
-    fps = 0
-    target_fps = 15
 
     # Run the inference on GPU
     providers = ['CUDAExecutionProvider', 'OpenVINOExecutionProvider', 'DmlExecutionProvider']
@@ -141,6 +149,11 @@ def main():
     input_name = ort_session.get_inputs()[0].name
     # Get available provider
     provider = [p for p in providers if p in ort_session.get_providers()]
+    
+    frame_count = 0
+    start_time = time.time()
+    fps = 0
+    target_fps = 12
 
     print(f"\nPerforming YOLO detection ", end="")
     if provider:
@@ -163,15 +176,17 @@ def main():
         input_img = preprocess_image(frame)        
         # Run YOLO detection on the input image
         results = process_image(input_img)
-        #results = ort_session.run(None, {input_name: input_img})
         # extract detections, draw boxes
-        result_img = postprocess_image(results, frame, 0.3)
+        result_img = postprocess_image(results, frame, 0.25)
+
+        # resize to something that's easily viewable onscreen
+        result_img = resize_with_aspect_ratio(result_img, width=720)
         # Show the frame rate
         frame_count += 1
         elapsed = time.time() - start_time
         if elapsed > 0:
             fps = int(frame_count / elapsed)
-            cv2.putText(result_img, f"{fps}fps", (5, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 250, 250), 1)
+            cv2.putText(result_img, f"{fps}fps", (5, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 250, 250), 1)
         # Display the resulting image
         cv2.imshow('YOLO on MJPEG Stream using GPU', result_img)
 
