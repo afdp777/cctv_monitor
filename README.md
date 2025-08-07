@@ -85,6 +85,7 @@ You can check which provider is active in the console output.
 - The script will download and export the YOLO `.pt` model to ONNX format on first run.
 - Class names are extracted from the Ultralytics model before export.
 - For best performance, ensure your GPU drivers are up to date.
+- The maximum value for the displayed `fps` is the actual frame rate of the video source. The displayed `fps` gets lower depending on your GPU performance. Set the `target_fps` at or below this lower frame rate.
 
 ## License
 
