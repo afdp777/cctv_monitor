@@ -170,6 +170,7 @@ def main():
 
         ret, frame = cap.read()
         if not ret:
+            print(f"Frame capture return code {ret}. Exiting program.")
             break
 
         # resize, normalize, convert to CHW
