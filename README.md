@@ -4,6 +4,7 @@ This project provides a Python script to monitor a CCTV RTSP stream using a YOLO
 The CCTV stream is from V380 Pro IP camera, like this: 
 <br><br>
 ![V380 Pro IP Camera](cctv_ip_camera.jpg)
+<br><br>I also tested this using the DroidCam Webcam app. 
 <br><br> Sample detection: <br><br>
 ![V380 Pro IP Camera](person_detected.jpg)
 <br><br> CPU and GPU Load: <br><br>

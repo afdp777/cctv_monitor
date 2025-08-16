@@ -44,6 +44,8 @@ COCO_CLASSES = []
 
 ort_session = None
 input_name = None
+detection_time = 0
+detected_class_id = -1
 
 
 def extract_coco_classes_from_ultralytics_yolo(model):
@@ -80,7 +82,7 @@ def process_image(input_img):
 
 # Postprocessing: extract detections, draw boxes
 def postprocess_image(outputs, img, conf_thres=0.4):
-    global COCO_CLASSES
+    global COCO_CLASSES, detection_time, detected_class_id
     predictions = np.transpose(np.squeeze(outputs[0]))
     boxes = []
     confidences = []
@@ -121,6 +123,10 @@ def postprocess_image(outputs, img, conf_thres=0.4):
             label = f"{COCO_CLASSES[class_id]}: {conf:.2f}"
             cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
             cv2.putText(img, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 250, 250), 2)
+            if detected_class_id != class_id or int(time.time() - detection_time) >= 30:
+                print(f"{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time()))}: {COCO_CLASSES[class_id]} detected")
+                detection_time = time.time()
+                detected_class_id = class_id
     return img
 
 
@@ -170,7 +176,7 @@ def main():
 
         ret, frame = cap.read()
         if not ret:
-            print(f"Frame capture return code {ret}. Exiting program.")
+            print(f"Frame capture failed.")
             break
 
         # resize, normalize, convert to CHW
