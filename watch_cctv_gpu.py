@@ -25,7 +25,7 @@ import onnxruntime as ort
 import numpy as np
 from ultralytics import YOLO
 import cv2
-import os, time
+import os, time, json
 import warnings
 
 warnings.filterwarnings("ignore", category=UserWarning, module="onnxruntime")
@@ -46,6 +46,9 @@ ort_session = None
 input_name = None
 detection_time = 0
 detected_class_id = -1
+drawing = False
+line_pt1 = line_pt2 = None
+aspect_ratio = 1
 
 
 def extract_coco_classes_from_ultralytics_yolo(model):
@@ -62,6 +65,28 @@ def export_yolo_to_onnx():
         #print("Number of classes:", model.model.nc)
         model.export(format="onnx", opset=17)
 
+def draw_line(event, x, y, flags, param):
+    global drawing, line_pt1, line_pt2, aspect_ratio
+    if event == cv2.EVENT_LBUTTONDOWN:
+        drawing = True
+        line_pt1 = (x, y)
+        line_pt2 = None
+    elif event == cv2.EVENT_LBUTTONUP and drawing:
+        drawing = False
+        line_pt2 = (x, y)
+        # save the points representing the line
+        with open("line.json", "w") as f:
+            json.dump({"line_pt1": line_pt1, "line_pt2": line_pt2}, f)
+
+def box_intersects_line(bx1, by1, bx2, by2, line_pt1, line_pt2):
+    # Normalize in case coords are not ordered
+    x_min, y_min = min(bx1, bx2), min(by1, by2)
+    x_max, y_max = max(bx1, bx2), max(by1, by2)
+
+    # Convert to rect (x, y, w, h)
+    rect = (x_min, y_min, x_max - x_min, y_max - y_min)
+    retval, _, _ = cv2.clipLine(rect, line_pt1, line_pt2)
+    return retval
 
 # Preprocessing: resize, normalize, convert to CHW
 def preprocess_image(img, img_size=640):
@@ -82,7 +107,7 @@ def process_image(input_img):
 
 # Postprocessing: extract detections, draw boxes
 def postprocess_image(outputs, img, conf_thres=0.4):
-    global COCO_CLASSES, detection_time, detected_class_id
+    global COCO_CLASSES, detection_time, detected_class_id, line_pt1, line_pt2, aspect_ratio
     predictions = np.transpose(np.squeeze(outputs[0]))
     boxes = []
     confidences = []
@@ -113,7 +138,6 @@ def postprocess_image(outputs, img, conf_thres=0.4):
     indices = cv2.dnn.NMSBoxes(boxes, confidences, conf_thres, nms_threshold=0.5)
 
     # Draw boxes
-    # for (x1, y1, x2, y2, conf, class_id) in boxes:
     for i in indices:
         x1, y1, x2, y2 = boxes[i]
         conf = confidences[i]
@@ -123,14 +147,23 @@ def postprocess_image(outputs, img, conf_thres=0.4):
             label = f"{COCO_CLASSES[class_id]}: {conf:.2f}"
             cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
             cv2.putText(img, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 250, 250), 2)
-            if detected_class_id != class_id or int(time.time() - detection_time) >= 30:
-                print(f"{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time()))}: {COCO_CLASSES[class_id]} detected")
-                detection_time = time.time()
-                detected_class_id = class_id
+            # issue alarm logs when there's a defined monitoring line
+            if line_pt1 is not None and line_pt2 is not None:
+                # the line was drawn based on dimension of window, so we scale it to the dimension of 'img'.
+                point1 = (int(line_pt1[0]*aspect_ratio), int(line_pt1[1]*aspect_ratio))
+                point2 = (int(line_pt2[0]*aspect_ratio), int(line_pt2[1]*aspect_ratio))
+                # log only when bounding box intersects with monitoring line
+                intersects = box_intersects_line(x1, y1, x2, y2, point1, point2)
+                # limit logging to console to every 30 seconds
+                if intersects and (detected_class_id != class_id or int(time.time() - detection_time) >= 30):
+                    detection_time = time.time()
+                    detected_class_id = class_id
+                    print(f"{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(detection_time))}: {COCO_CLASSES[class_id]} detected")
     return img
 
 
 def resize_with_aspect_ratio(image, width=None, height=None, inter=cv2.INTER_AREA):
+    global aspect_ratio
     (h, w) = image.shape[:2]
     if width is None and height is None:
         return image
@@ -140,15 +173,24 @@ def resize_with_aspect_ratio(image, width=None, height=None, inter=cv2.INTER_ARE
     else:
         r = width / float(w)
         dim = (width, int(h * r))
+    aspect_ratio = dim[0] / dim[1]
     return cv2.resize(image, dim, interpolation=inter)
 
 
 def main():
-    global ort_session, input_name
+    global ort_session, input_name, line_pt1, line_pt2
     # download the ultralytics yolo model
     export_yolo_to_onnx()
+    # load the line points
+    try:
+        with open("line.json", "r") as f:
+            data = json.load(f)
+            line_pt1 = tuple(data["line_pt1"])
+            line_pt2 = tuple(data["line_pt2"])
+    except Exception as e:
+        print(f"Error loading 'line.json'")
 
-    # Run the inference on GPU
+    # Run the inference on GPU (CUDA and OpenVINO were untested 'coz I don't have them)
     providers = ['CUDAExecutionProvider', 'OpenVINOExecutionProvider', 'DmlExecutionProvider']
     ort_session = ort.InferenceSession(onnx_model, providers=providers)
     # Get the input name from the ONNX model
@@ -167,6 +209,11 @@ def main():
     else:
         print("using CPU")
     print(f"YOLO model: {yolo_model}\nTarget fps: {target_fps}")
+    print("Detection logs with timestamp follows here.\nCorrelate with timestamp of recorded CCTV video.\n*****BEGIN LOG*****")
+
+    window_name = 'YOLO on MJPEG Stream using GPU'
+    cv2.namedWindow(window_name)
+    cv2.setMouseCallback(window_name, draw_line)
 
     while True:
         # Skip frames to catch up
@@ -193,9 +240,15 @@ def main():
         elapsed = time.time() - start_time
         if elapsed > 0:
             fps = int(frame_count / elapsed)
-            cv2.putText(result_img, f"{fps}fps", (5, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 250, 250), 1)
+            if elapsed >= 60:
+                frame_count = 0
+                start_time = time.time()
+            cv2.putText(result_img, f"{fps}fps", (5, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 250, 250), 1)    
+        # Draw the line
+        if line_pt1 is not None and line_pt2 is not None:
+            cv2.line(result_img, line_pt1, line_pt2, (0, 255, 255), 2)
         # Display the resulting image
-        cv2.imshow('YOLO on MJPEG Stream using GPU', result_img)
+        cv2.imshow(window_name, result_img)
 
         # Press 'q' to exit
         if cv2.waitKey(1) & 0xFF == ord('q'):
