@@ -17,6 +17,7 @@ The CCTV stream is from V380 Pro IP camera, like this:
 - Hardware acceleration via DirectML on Windows OS. Fallback to CPU.
 - Displays detected objects with class names and confidence
 - Shows real-time FPS and can skip frames to maintain target frame rate
+- Draw custom monitoring line to raise alarm message whenever a detected object intersects it
 
 ## Requirements
 
